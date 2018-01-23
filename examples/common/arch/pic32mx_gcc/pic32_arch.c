@@ -41,7 +41,7 @@
  ******************************************************************************/
 
 //-- system frequency
-#define SYS_FREQ 80000000UL
+#define SYS_FREQ 40000000UL
 
 //-- peripheral bus frequency
 #define PB_FREQ 40000000UL
@@ -50,7 +50,7 @@
 #define SYS_TMR_FREQ 1000
 
 //-- system timer prescaler
-#define SYS_TMR_PRESCALER T5_PS_1_8
+#define SYS_TMR_PRESCALER 3
 #define SYS_TMR_PRESCALER_VALUE 8
 
 //-- system timer period (auto-calculated)
@@ -88,7 +88,7 @@ TN_STACK_ARR_DEF(interrupt_stack, INTERRUPT_STACK_SIZE);
 
 /*** system timer ISR*/
 tn_p32_soft_isr(_TIMER_5_VECTOR) {
-  INTClearFlag(INT_T5);
+  IFS0CLR = _IFS0_T5IF_MASK;
   tn_tick_int_processing();
 }
 
@@ -96,9 +96,63 @@ tn_p32_soft_isr(_TIMER_5_VECTOR) {
  *    FUNCTIONS
  ******************************************************************************/
 
+static void prvConfigurePeripheralBus(void);
+void vHardwareConfigurePerformance(void) {
+  unsigned long ulStatus;
+  ulStatus = _CP0_GET_STATUS();
+  _CP0_SET_STATUS(ulStatus & ~hwGLOBAL_INTERRUPT_BIT);
+  prvConfigurePeripheralBus();
+  /* Disable DRM wait state. */
+  BMXCONCLR = _BMXCON_BMXWSDRM_MASK;
+  _CP0_SET_STATUS(ulStatus);
+}
+/*-----------------------------------------------------------*/
+static void prvConfigurePeripheralBus(void) {
+  unsigned long ulDMAStatus, xOSCCONBits;
+  ulDMAStatus = (DMACON & _DMACON_SUSPEND_MASK);
+  if (ulDMAStatus == 0) {
+    DMACONSET = _DMACON_SUSPEND_MASK;
+    while ((DMACON & _DMACON_SUSPEND_MASK) == 0)
+      ; /* Wait until actually suspended. */
+  }
+  SYSKEY = 0;
+  SYSKEY = hwUNLOCK_KEY_0; /* Unlock after suspending. */
+  SYSKEY = hwUNLOCK_KEY_1;
+  xOSCCONBits = OSCCON; /* Read to start in sync. */
+  // xOSCCONBits.PBDIV = 0;
+  // xOSCCONBits.w |= hwPERIPHERAL_CLOCK_DIV_BY_2;
+  OSCCON = xOSCCONBits;   /* Write back. */
+  xOSCCONBits = OSCCON;   /* Ensure the write occurred. */
+  SYSKEY = hwLOCK_KEY;    /* Lock again. */
+  if (ulDMAStatus == 0) { /* Resume DMA activity. */
+    DMACONCLR = _DMACON_SUSPEND_MASK;
+  }
+}
+
+void vHardwareUseMultiVectoredInterrupts(void) {
+  unsigned long ulStatus;  //, ulCause;
+  extern unsigned long _ebase_address[];
+  ulStatus = _CP0_GET_STATUS();                  /* Get current status. */
+  ulStatus &= ~hwGLOBAL_INTERRUPT_BIT;           /* Disable interrupts. */
+  ulStatus |= hwBEV_BIT;                         /* Set BEV bit. */
+  _CP0_SET_STATUS(ulStatus);                     /* Write status back. */
+  _CP0_SET_EBASE((unsigned long)_ebase_address); /* Setup EBase. */
+  //	ulCause = _CP0_GET_CAUSE();/* Set the IV bit in the CAUSE register. */
+  //	ulCause |= hwIV_BIT;
+  //	_CP0_SET_CAUSE( ulCause );
+  /* Space vectors by 0x20 bytes. */
+  _CP0_XCH_INTCTL(0x20);
+  ulStatus &= ~(hwBEV_BIT | hwEXL_BIT); /* Clear BEV and EXL bits in status. */
+  _CP0_SET_STATUS(ulStatus);
+  /* Set MVEC bit. */
+  INTCONSET = _INTCON_MVEC_MASK;
+  /* Finally enable interrupts again. */
+  ulStatus |= hwGLOBAL_INTERRUPT_BIT;
+  _CP0_SET_STATUS(ulStatus);
+}
 /** Hardware init: called from main() with interrupts disabled */
 void hw_init(void) {
-  SYSTEMConfig(SYS_FREQ, SYS_CFG_WAIT_STATES | SYS_CFG_PCACHE);
+  /*SYSTEMConfig(SYS_FREQ, SYS_CFG_WAIT_STATES | SYS_CFG_PCACHE);
   //-- turn off ADC function for all pins
   AD1PCFG = 0xffffffff;
   {  //-- Set power-saving mode to an idle mode
@@ -121,6 +175,19 @@ void hw_init(void) {
   INTClearFlag(INT_T5);
   INTEnable(INT_T5, INT_ENABLED);
   INTConfigureSystem(INT_SYSTEM_CONFIG_MULT_VECTOR);  //-- enable multi-vectored interrupt mode
+*/
+
+  vHardwareConfigurePerformance();
+  T5CONCLR = _T5CON_w_MASK;
+  PR5CLR = _T5CON_w_MASK;
+  TMR5CLR = _T5CON_w_MASK;
+  IPC5CLR = _IPC5_T5IS_MASK & _IPC5_T5IP_MASK;
+  IFS0CLR = _IFS0_T5IF_MASK;
+  PR5 = (SYS_TMR_PERIOD - 1);
+  IPC5SET = ((2<<_IPC5_T5IP_POSITION) + (0<<_IPC5_T5IS_POSITION));
+  T5CONSET = (_T5CON_ON_MASK + (SYS_TMR_PRESCALER<<_T5CON_TCKPS_POSITION));
+IEC0SET = _IEC0_T5IE_MASK;
+vHardwareUseMultiVectoredInterrupts();
 }
 
 //-- idle callback that is called periodically from idle task

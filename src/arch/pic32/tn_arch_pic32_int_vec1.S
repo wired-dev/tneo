@@ -77,7 +77,7 @@ _you_should_add_file___tn_arch_pic32_int_vec1_S___to_the_project:
 
 
 
-    .section    .vector_1,code
+    .section    .vector_1,"ax",@progbits
     .align  2
     .set    nomips16
 

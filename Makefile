@@ -101,21 +101,32 @@ endif
 ifeq ($(TN_ARCH), $(filter $(TN_ARCH), pic32mx))
    TN_ARCH_DIR = pic32
 
-   ifeq ($(TN_COMPILER), $(filter $(TN_COMPILER), xc32))
-
+   ifeq ($(TN_COMPILER), $(filter $(TN_COMPILER), xc32 mips-none-elf-gcc))
       ifeq ($(TN_ARCH), pic32mx)
          PIC32MX_FLAGS = -mprocessor=32MX440F512H
       endif
 
       ifeq ($(TN_COMPILER), xc32)
          CC = xc32-gcc
-         AR = xc32-ar
+         AR = xc32-gcc-ar
          CFLAGS = $(PIC32MX_FLAGS) $(CFLAGS_COMMON) -g -x c -std=c99
          ASFLAGS = $(PIC32MX_FLAGS)
          TN_COMPILER_VERSION_CMD := $(CC) --version
 
          BINARY_CMD = $(AR) -r $(BINARY) $(OBJS)
       endif
+
+      ifeq ($(TN_COMPILER), mips-none-elf-gcc)
+BASECC = /opt/mips-gcc/bin
+CC = $(BASECC)/mips-gcc
+AR = $(BASECC)/mips-gcc-ar
+         CFLAGS = $(CFLAGS_COMMON) -flto -march=m4k -mtune=m4k -g -x c -std=c99 -D__PIC32MX__ -D__XC32 -D__GCC 
+         ASFLAGS = -D__PIC32MX__ -D__XC32 -D__GCC
+         TN_COMPILER_VERSION_CMD := $(CC) --version
+
+         BINARY_CMD = $(AR) -r $(BINARY) $(OBJS)
+      endif
+
 
    endif
 endif

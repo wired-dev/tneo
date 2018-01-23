@@ -97,7 +97,9 @@
 #elif defined (__PIC32MX__)
 
 #  define __TN_ARCH_PIC32MX__
+#elif defined (__GCC)
 
+#  define __TN_ARCH_PIC32MX__
 #elif defined (__ARMCC_VERSION)
 
 #  define __TN_ARCH_CORTEX_M__

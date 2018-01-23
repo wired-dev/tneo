@@ -260,7 +260,10 @@ typedef  unsigned int               TN_UIntPtr;
                                     : "=d" (TN_INTSAVE_VAR)                   \
                                     )
 #  define TN_INT_RESTORE()    _TN_PIC32_INTSAVE_CHECK();                      \
-                              __builtin_mtc0(12, 0, TN_INTSAVE_VAR)
+                              __asm__ __volatile__(                           \
+                                    "ei %0; ehb"                              \
+                                    : "+d" (TN_INTSAVE_VAR)                   \
+                                    )
 #endif
 
 /**
@@ -283,8 +286,10 @@ typedef  unsigned int               TN_UIntPtr;
 
 /**
  * Returns nonzero if interrupts are disabled, zero otherwise.
+ * 
+ * #define TN_IS_INT_DISABLED()     ((__builtin_mfc0(12, 0) & 1) == 0)
  */
-#define TN_IS_INT_DISABLED()     ((__builtin_mfc0(12, 0) & 1) == 0)
+#define TN_IS_INT_DISABLED()     ((_CP0_GET_STATUS() & 1) == 0)
 
 /**
  * Pend context switch from interrupt.

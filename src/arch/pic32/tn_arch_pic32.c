@@ -77,8 +77,11 @@
 
 #include "_tn_tasks.h"
 #include "_tn_sys.h"
+#if !__GCC
 #include <xc.h>
-
+#else
+#include "p32mx150f128b.h"
+#endif
 
 
 /*******************************************************************************
@@ -250,23 +253,13 @@ TN_UWord *_tn_arch_stack_init(
 }
 
 
-/*
- * See comments in the file `tn_arch.h`
- */
-void tn_arch_int_dis(void)
-{
-    __builtin_disable_interrupts();
+void  tn_arch_int_dis(void){
+    __asm__ ("di");    //__builtin_disable_interrupts();
 }
-
-
-/*
- * See comments in the file `tn_arch.h`
- */
-void tn_arch_int_en(void)
-{
-   __builtin_enable_interrupts();
+/** See comments in the file `tn_arch.h` */
+void tn_arch_int_en(void) {
+	__asm__ ("ei");   //__builtin_enable_interrupts();
 }
-
 
 
 /*
